@@ -1,0 +1,199 @@
+---
+title: "Fish heart activity"
+author: Gavin L. Simpson
+format:
+  html:
+    toc: true
+    html-math-method: katex
+    embed-resources: true
+knitr:
+  opts_chunk: 
+    echo: true
+    fig.align: center
+highlight-style: github-dark
+---
+
+In this part of the fish heart activity we will use R to
+
+* summarise your fish heart measurements
+* visualise the measurements, and
+* do some statistical testing.
+
+We begin by loading some packages
+
+```{r}
+#| message: false
+library("readxl")  # to import data from Excel workbooks
+library("dplyr")   # for data wrangling
+library("janitor") # for data cleaning
+library("tidyr")   # for moar data wrangling
+library("ggplot2") # for data visualisation
+library("lme4")    # for a proper model if we have time
+```
+
+(Note we do not show the messages that get printed when the packages are loaded.)
+
+## Log in to Posit cloud
+
+Go to <posit.cloud> and log in
+
+Then click on [New Project]{.highlight} in the top right of the screen
+
+Give a name to your project, say `Dyr og væv fish heart`, while the R session is being deployed on a virtual computer
+
+## Start a new script
+
+Click the small `+` icon in the top left and select `R Script` or use `File` > `New File` > `R Script`
+
+Save this script; click the small "disk" icon or use `File` > `Save`
+
+Give the file the name `fish-heart-analysis.R` (note the `.R` extension --- case sensitive! --- and no spaces)
+
+## Download the data to RStudio
+
+We will start be downloading the data
+
+```{r}
+#| eval: false
+download.file("https://bit.ly/fish-weights", "fish-weights.xlsx")
+```
+
+This will download the Excel workbook we created from your data during the break
+
+It will create a file in your project called `fish-hearts.xlsx`
+
+## Read the data into R
+
+Next we need to read the data into R itself; currently the data are just sitting in a Excel workbook on a computer in the cloud.
+
+```{r}
+fish_meta <- read_excel("fish-weights.xlsx", "fish-meta")
+fish_weight <- read_excel("fish-weights.xlsx", 
+"fish-weight")
+```
+
+We can view the data by typing the object name at the console
+
+`<-` is the [assignment operator]{.highlight} --- AKA **arrow**
+
+```{r}
+fish_meta
+fish_weight
+```
+
+This is a data frame, basically R's version of an Excel sheet
+
+* the columns are the variables,
+* the rows are the observations,
+* each variable is of the same length (number of elements)
+
+## Merging data
+
+```{r}
+fish <- fish_weight |>
+  left_join(fish_meta, by = join_by(fish_number)) |>
+  mutate(fish_number = as.character(fish_number)) |>
+  rename(weight = observation)
+```
+
+## Summarise your own technical replicates
+
+Now we can do a simple data summary to filter the fish heart data to leave only your own observations and then compute the mean of your replicates
+
+```{r}
+my_fish <- "1" ## <- put your fish number in
+fish |>
+  filter(fish_number == my_fish) |>
+  summarise(avg_weight = mean(weight))
+```
+
+The `|>` character is known as the [pipe]{.highlight}; when you see it in code read it as meaning "and then...".
+
+The `filter()` step in the pipeline filters the full data set to include only the select pair of data. Then we use `summarise()` to create a summary of that pair's data, computing the average weight using the `mean()` function.
+
+In words then we can describe what we did as
+
+* assign my pair  number to the object `my_pair`, then
+* take the `fish` data, and then
+* filter it to keep only my pair's data, and then
+* summarise the remaining data by computing the average weight of my technical replicates.
+
+We can compute an estimate of the uncertainty in this average weight (as an estimate of the weight of the average fish heart) using the standard error:
+
+$$
+\widehat{\sigma}_{\overline{\text{weight}}} = \frac{\widehat{\sigma}}{\sqrt{n}}
+$$
+
+(Note the typo in the video --- the denominator should be $\sqrt{n}$; one of my cats was crying at the office door to get in!)
+
+We can modify the pipeline we just used to alos compute the standard error of the average weight of your fish heart. Copy the code you wrote above and paste a new versio of it and then edit the `summaris()` line so that the code looks like
+
+```{r}
+my_fish <- "1" ## <- put your pair number in
+fish |>
+  filter(fish_number == my_fish) |>
+  summarise(avg_weight = mean(weight),
+    std_err = sd(weight) / sqrt(n()))
+```
+
+## Summarise each pair's technical replicates
+
+We can use almost the same code to compute the average for each pair's data and the associated standard errors
+
+```{r}
+fish |>
+  group_by(fish_number) |>
+  summarise(avg_weight = mean(weight),
+    std_err = sd(weight) / sqrt(n()))
+```
+
+Note that this time we do not need the `filter()` step in the pipeline; instead we replace that with a `group_by()` step. The `summarise()` step remains the same.
+
+## Visualise the data
+
+Next we can plot the data. For this we will use `ggplot()` from the **ggplot2** package.
+
+```{r}
+fish |>
+  ggplot(aes(x = fish_number, y = weight)) +
+  geom_point()
+```
+
+We can add the means and standard errors, that we computed earlier, to the plot. Go back and copy the code block where we computed the means and standard errors for each pair's data, and paste a new copy below the code for the plot. Then mofidy the first line so we assign the output to a new object:
+
+```{r}
+avg_fish_wt <- fish |>                  # <--- change this line
+  group_by(fish_number) |>
+  summarise(avg_weight = mean(weight),
+    std_err = sd(weight) / sqrt(n()))
+```
+
+One way to visualise this data is to use a [confidence interval]{.highlight}, the definition of which is a little technical. For a 95% confidence interval
+
+> if we were to repeat the exercise 100 times, colelcting new data each time, on average 95% of the intervals we create will contain the true value
+
+A simple rule of thumb that we can use to create a 95% interval is to compute an upper and lower limit such that
+
+* the upper limit is the mean **plus** 2 times the standard error
+* the lower limit is the mean **minus** 2 times the standard error
+
+We do this operation in the next line
+
+```{r}
+avg_fish_wt <- avg_fish_wt |>
+  mutate(lwr_ci = avg_weight - (2 * std_err),
+    upr_ci = avg_weight + (2 * std_err))
+```
+
+Now we can replot the data using the same code as before (copy and paste a new version of it), but we add an additional layer
+
+```{r}
+fish |>
+  ggplot(aes(x = fish_number, y = weight)) +
+  geom_point(alpha = 0.5) +
+  geom_pointrange(data = avg_fish_wt,
+    aes(y = avg_weight, ymin = lwr_ci, ymax = upr_ci),
+    colour = "red"
+  )
+```
+
