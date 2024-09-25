@@ -18,6 +18,7 @@ highlight-style: github-dark
 #| label: setup
 library("ggdist")
 library("distributional")
+library("patchwork")
 ```
 
 In this part of the fish heart activity we will use R to
@@ -240,13 +241,13 @@ Are there any fish that do not fit the general pattern?
 How might you describe the condition of this fish?
 :::
 
-We can describe this relationship using a *linear model*. A linear model is the name we give to models that are linear in their parameters, not those that describe straight lines. A model that is linear in its parameters, i.e.
+We can describe this relationship using a *linear model*. A linear model is the name we give to models that are linear in their parameters, not those that describe straight lines. A linear model is one that is linear in its parameters, i.e.
 
 $$
 \hat{y}_i = \beta_0 + \beta_1 x_1 + \beta_2 x_2, + \cdots
 $$
 
-Here, the parameters are the $\beta_j$ and they are only involved in additions or multiplications, they are not found in powers (exponents). $\beta_0$ is the model **intercept**, while the other $\beta_j$ are estimates of by how much the response, $y$, changes if we increase the covariate (here $x_1$ or $x_2$ depending on which $\beta_j$ we are looking at) by one (1) unit.
+Here, the parameters are the $\beta_j$ and they are only involved in additions or multiplications, they are not found in powers (exponents). $\beta_0$ is the model **intercept**, while the other $\beta_j$ are estimates of by how much the response, $y$, changes if we increase the covariate (here $x_1$ or $x_2$ depending on which $\beta_j$ we are looking at) by one (1) unit, holding all other covariates at some fixed value(s).
 
 For the body condition relationship, our model will be
 
@@ -296,7 +297,7 @@ Where did these numbers come from? They come from the linear model described abo
 fish_bc <- lm(body_mass_g ~ fork_length_cm, data = fish_meta)
 ```
 
-We use the `lm()` function to fit a linear model where we assume the response is *conditionally distributed* normal (Gaussian). The first argument to `lm()` is the *formula* for the model we want to fit. The variable to the left of the `~` is the response, the variable we are modelling, while we put the covariates (independent variables) that we use to model the response on the right of the `~`, separated by `+`. As we only have one covariate in our model there is only one variable named on the right of the `~`. We have to tell R where to find the variables, which e do with the `data` argument.
+We use the `lm()` function to fit a linear model where we assume the response is *conditionally distributed* normal (Gaussian). The first argument to `lm()` is the *formula* for the model we want to fit. The variable to the left of the `~` is the response, the variable we are modelling, while we put the covariates (independent variables) that we use to model the response on the right of the `~`, separated by `+`. As we only have one covariate in our model there is only one variable named on the right of the `~`. We have to tell R where to find the variables, which we do with the `data` argument.
 
 The estimated values for $\beta_0$ and $\beta_1$ are called the model coefficients. We can access them via the `coef()` function
 
@@ -304,17 +305,17 @@ The estimated values for $\beta_0$ and $\beta_1$ are called the model coefficien
 coef(fish_bc)
 ```
 
-We can ignore the intercept ($\beta_0$) here (it's not useful as it gives the expected `body_mass_g` in a fish with a `fork_length_cm` equal to **0**! This doesn't make any sense!) The value for $\beta_1$, labelled `fork_length_cm`, is by how much the *estimated* `body_mass_g` of a fish would change if its `fork_length_cm` was increased by 1cm.
+We can ignore the intercept ($\beta_0$) here (it's not useful as it gives the expected `body_mass_g` in a fish with a `fork_length_cm` equal to **0**! This doesn't make any biological sense! This should flag a problem with this entire model that we'll come to at the end of this document.) The value for $\beta_1$, labelled `fork_length_cm`, is by how much the *estimated* `body_mass_g` of a fish would change if its `fork_length_cm` was increased by 1cm.
 
-We can test to see if this magnitude of change in `body_mass_g` for a unit increased in `fork_length_mm` is statistically interesting using `summary()`
+We can test to see if this magnitude of change in `body_mass_g` for a unit increased in `fork_length_mm` is *statistically* interesting using `summary()`
 
 ```{r}
 summary(fish_bc)
 ```
 
-In the `Estimate` column we see the estimates of the coefficients (rounded slightly). The column labelled `Std. Error` is the *standard error* of the estimates; it is a measure of our uncertainty in the estimates.
+In the `Estimate` column we see the same estimates of the coefficients (rounded slightly) that we saw using `coef(fish_bc)`. The column labelled `Std. Error` is the *standard error* of the estimates; it is a measure of our uncertainty in the estimates; it is similar to the *standard error of the mean* that we computed previously.
 
-What we mean by *statistically interesting* is that an estimate is unlikely to have been observed if the true value of the estimate was equal to 0. This is a hypothesis and in and of itself is not *scientifically* interesting; it is called the *Null hypothesis* because it represents an expectation of **no effect** (hence "null") of `fork_length_mm` on the `body_mass_g` of our fish.
+What we mean by *statistically interesting* is that an estimate is unlikely to have been observed if the true value of the estimate was equal to 0. This is an *hypothesis*, and in and of itself is not *scientifically* interesting; it is called the *Null hypothesis* because it represents an expectation of **no effect** (hence "null") of `fork_length_mm` on the `body_mass_g` of our fish.
 
 To test this null hypothesis we need a *test statistic*. For math reasons, the typical test statistic in a Normal linear regression model is a $t$ statistic. It is computed as
 
@@ -470,7 +471,7 @@ One way to proceed would be to take the average of the replicated values for eac
 But, regardless, let's try that. First, compute the average fish heart mass per fish --- note that we did this last week, and it is included above, but I repeat this code here, with 1 change:
 
 ```{r}
-avg_heart_mass <- fish |>                  # <--- change this line
+avg_heart_mass <- fish |>
   group_by(fish_number) |>
   summarise(avg_mass_g = mean(weight),
     std_err = sd(weight) / sqrt(n())) |>
@@ -510,7 +511,7 @@ summary(mass_mixed)
 
 The output labelled `Fixed effect:` largely resembles the output for `avg_mass_m` --- it would be effectively exact if we had the same number of replicates per fish --- and nothing here would change our conclusion that the effect of `body_mass_g` on `weight` (fish heart mass) is *statistically interesting*. But do note the much larger $p$ value now compared to the one we got earlier when we assumed the data were independent.
 
-The output labelled `Random effects:` contains information about how much variation there is **within** individual fish and between fishes. The row labelled `fish_number` is the estimate of the variation *between* fishes, while the row labelled `Residual` is the variation within a fish.
+The output labelled `Random effects:` contains information about how much variation there is **within** individual fish and **between** fishes. The row labelled `fish_number` is the estimate of the variation *between* fishes, while the row labelled `Residual` is the variation **within** a fish.
 
 As an aside; last week we computed and estimate for the the average mass of a fish heart. We might get a better estimate if we recomputed that estimated using the mixed model:
 
@@ -532,15 +533,35 @@ fish |>
 We assumed that each response value in our models is normally distributed with it's mean given by the estimated value from the model. The normal distribution describes data that are 
 
 1. continuous, and
-2. can take *any* value, positive or **negative** from negative infinity (-&infin;) to positive infinity (+&infin;)
+2. can take *any* value, positive or **negative**, from negative infinity (-&infin;) to positive infinity (+&infin;)
 
 Our fish heart masses and body masses certainly meet the first criteria, but the second criteria allows for fish that couldn't possibly exist.
 
-We cannot observe a fish heart mass or body mass that is less than or even equal to 0g (technically 🤓 &nbsp; there is some lower mass limit below which we cannot go because our balances are not sensitive enough). Hence at 0g mass, we have no fish and there is zero variance in the mass. If the variance in fish heart mass decreases to zero as the heart mass approaches 0, the variance must increase to some extent as the heart mass increases away from 0.
+We cannot observe a fish heart mass or body mass that is less than --- or even equal to --- 0g (technically 🤓 &nbsp; there is some lower mass limit below which we cannot go because our balances are not sensitive enough). Hence at 0g mass, we have no fish and there is zero variance in the mass. If the variance in fish heart mass decreases to zero as the heart mass approaches 0, the variance must increase to some extent as the heart mass increases away from 0.
 
-We would call this **non-constant variance** or **heteroscedasticity**. This won't stop us fitting the normal linear model ---  we just did it! --- but it will make the *inference* --- deciding if something was *statistically interesting* or not --- in valid. How badly invalid, we don't know (it depends).
+We would call this **non-constant variance** or **heteroscedasticity**. This won't stop us fitting the normal linear model ---  we just did it! --- but it will make the *inference* --- deciding if something was *statistically interesting* or not --- invalid. How badly invalid? We don't know without fitting models as it depends on many things.
 
-One solution to this is to fit a model where we don't assume the data are conditionally distributed normal. An option would be to use a Gamma or a log-normal distribution for example. If we couple this with the need to account for the non-**independence** of our data, we would need a model called a **generalized** linear mixed model (GLMM). This model is easy (LOL) to fit
+One solution to this problem is to fit a model where we don't assume the data are conditionally distributed normal. An option would be to use a Gamma or a log-normal distribution for example.
+
+The Gamma and log-normal distributions look like this (for some values of the parameters of these distributions):
+
+```{r}
+#| echo: false
+df <- data.frame(x = seq(0, 10, length = 200))
+df <- transform(df, values = dlnorm(x, meanlog = log(2), sdlog = log(2)))
+p1 <- ggplot(df, aes(x = x, y = values)) + geom_line() + 
+  ggtitle("Log-normal distribution") +
+  ylab("Probability Density")
+df <- transform(df, values = dgamma(x, shape = 2, rate = 1))
+p2 <- ggplot(df, aes(x = x, y = values)) + geom_line() +
+  ggtitle("Gamma distribution") +
+  ylab("Probability Density")
+p1 + p2
+```
+
+Notice how these distributions don't extend into negative territory and they are **skewed**. Both of these distributions would be better choices for fish heart mass and fish body mass.
+
+If we couple this with the need to account for the non-**independence** of our data, we would need a model called a **generalized** linear mixed model (GLMM). This model is easy (LOL) to fit, in this case using the Gamma distribution
 
 ```{r}
 ## rescale the variables to be more similar to one another
