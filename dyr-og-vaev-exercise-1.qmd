@@ -31,7 +31,7 @@ We begin by installing some package
 
 ```{r}
 #| eval: false
-pkgs <- c("readxl", "dplyr", "janitor", "tidyr", "ggplot2", "lme4", "marginaleffects")
+pkgs <- c("readxl", "dplyr", "janitor", "tidyr", "ggplot2", "lme4", "marginaleffects", "lmerTest")
 install.packages(pkgs)
 ```
 
